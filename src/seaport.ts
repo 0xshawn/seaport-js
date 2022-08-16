@@ -184,6 +184,11 @@ export class Seaport {
       })),
     ];
 
+    console.log(">>> offer", offer);
+    console.log(">>> consideration", consideration);
+    console.log(">>> considerationItems", considerationItems);
+    console.log(">>> offerItems", offerItems);
+
     if (
       !areAllCurrenciesSame({
         offer: offerItems,
@@ -200,8 +205,12 @@ export class Seaport {
     );
 
     const totalCurrencyAmount = totalItemsAmount(currencies);
+    console.log(">>> totalCurrencyAmount", totalCurrencyAmount);
 
     const operator = this.config.conduitKeyToConduit[conduitKey];
+    console.log(">>> operator", operator);
+    console.log(">>> counter", counter);
+    console.log(">>> offerer", offerer);
 
     const [resolvedCounter, balancesAndApprovals] = await Promise.all([
       counter ?? this.getCounter(offerer),
@@ -213,11 +222,14 @@ export class Seaport {
         operator,
       }),
     ]);
+    console.log(">>> resolvedCounter", resolvedCounter);
+    console.log(">>> balancesAndApprovals", balancesAndApprovals);
 
     const orderType = this._getOrderTypeFromOrderOptions({
       allowPartialFills,
       restrictedByZone,
     });
+    console.log(">>> orderType", orderType);
 
     const considerationItemsWithFees = [
       ...deductFees(considerationItems, fees),
@@ -232,6 +244,7 @@ export class Seaport {
           ) ?? []
         : []),
     ];
+    console.log(">>> considerationItemsWithFees", considerationItemsWithFees);
 
     const orderParameters: OrderParameters = {
       offerer,
@@ -247,23 +260,27 @@ export class Seaport {
       salt,
       conduitKey,
     };
+    console.log(">>> orderParameters", orderParameters);
 
-    const checkBalancesAndApprovals =
-      this.config.balanceAndApprovalChecksOnOrderCreation;
+    // const checkBalancesAndApprovals =
+    //   this.config.balanceAndApprovalChecksOnOrderCreation;
 
-    const insufficientApprovals = checkBalancesAndApprovals
-      ? validateOfferBalancesAndApprovals({
-          offer: offerItems,
-          criterias: [],
-          balancesAndApprovals,
-          throwOnInsufficientBalances: checkBalancesAndApprovals,
-          operator,
-        })
-      : [];
+    // const insufficientApprovals = checkBalancesAndApprovals
+    //   ? validateOfferBalancesAndApprovals({
+    //       offer: offerItems,
+    //       criterias: [],
+    //       balancesAndApprovals,
+    //       throwOnInsufficientBalances: checkBalancesAndApprovals,
+    //       operator,
+    //     })
+    //   : [];
+    const insufficientApprovals = [] as any;
+    console.log(">>> insufficientApprovals", insufficientApprovals);
 
-    const approvalActions = checkBalancesAndApprovals
-      ? await getApprovalActions(insufficientApprovals, signer)
-      : [];
+    // const approvalActions = checkBalancesAndApprovals
+    //   ? await getApprovalActions(insufficientApprovals, signer)
+    //   : [];
+    const approvalActions = [] as any;
 
     const createOrderAction = {
       type: "create",

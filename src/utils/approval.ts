@@ -18,6 +18,8 @@ export const approvedItemAmount = async (
 ) => {
   if (isErc721Item(item.itemType) || isErc1155Item(item.itemType)) {
     // isApprovedForAll check is the same for both ERC721 and ERC1155, defaulting to ERC721
+    console.log("approvedItemAmount, is Erc721Item");
+    console.log("approvedItemAmount item", item);
     const contract = new Contract(
       item.token,
       ERC721ABI,

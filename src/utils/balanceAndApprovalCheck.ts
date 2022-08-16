@@ -75,19 +75,28 @@ export const getBalancesAndApprovals = async ({
   operator: string;
   multicallProvider: multicallProviders.MulticallProvider;
 }): Promise<BalancesAndApprovals> => {
+  console.log(">>> owner", owner);
+  console.log(">>> items", items);
+  console.log(">>> criterias", criterias);
+  console.log(">>> operator", operator);
   const itemToCriteria = getItemToCriteriaMap(items, criterias);
+  console.log(">>> itemToCriteria", itemToCriteria);
 
   return Promise.all(
     items.map(async (item) => {
       let approvedAmountPromise = Promise.resolve(BigNumber.from(0));
 
       if (isErc721Item(item.itemType) || isErc1155Item(item.itemType)) {
+        console.log(
+          "isErc721Item(item.itemType) || isErc1155Item(item.itemType)"
+        );
         approvedAmountPromise = approvedItemAmount(
           owner,
           item,
           operator,
           multicallProvider
         );
+        console.log(">>> approvedAmountPromise", approvedAmountPromise);
       } else if (isErc20Item(item.itemType)) {
         approvedAmountPromise = approvedItemAmount(
           owner,

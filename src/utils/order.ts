@@ -73,12 +73,13 @@ export const mapInputItemToOfferItem = (item: CreateInputItem): OfferItem => {
     // Convert this to a criteria based item
     if ("identifiers" in item) {
       const tree = new MerkleTree(item.identifiers);
-
+      console.log(">>> tree root", tree.getRoot().toString());
       return {
-        itemType:
-          item.itemType === ItemType.ERC721
-            ? ItemType.ERC721_WITH_CRITERIA
-            : ItemType.ERC1155_WITH_CRITERIA,
+        // itemType:
+        //   item.itemType === ItemType.ERC721
+        //     ? ItemType.ERC721_WITH_CRITERIA
+        //     : ItemType.ERC1155_WITH_CRITERIA,
+        itemType: ItemType.ERC721_WITH_CRITERIA,
         token: item.token,
         identifierOrCriteria: tree.getRoot(),
         startAmount: item.amount ?? "1",
@@ -90,7 +91,7 @@ export const mapInputItemToOfferItem = (item: CreateInputItem): OfferItem => {
       return {
         itemType: item.itemType,
         token: item.token,
-        identifierOrCriteria: item.identifier,
+        identifierOrCriteria: item.identifier || "0",
         startAmount: item.amount,
         endAmount: item.endAmount ?? item.amount ?? "1",
       };
@@ -99,7 +100,7 @@ export const mapInputItemToOfferItem = (item: CreateInputItem): OfferItem => {
     return {
       itemType: item.itemType,
       token: item.token,
-      identifierOrCriteria: item.identifier,
+      identifierOrCriteria: item.identifier || "0",
       startAmount: "1",
       endAmount: "1",
     };
