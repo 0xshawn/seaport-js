@@ -324,6 +324,11 @@ export class Seaport {
           signature,
         };
       },
+      getOrder: async () => {
+        return {
+          parameters: { ...orderParameters, counter: resolvedCounter },
+        };
+      },
     } as const;
 
     const actions = [...approvalActions, createOrderAction] as const;
