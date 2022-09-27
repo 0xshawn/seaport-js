@@ -15,6 +15,7 @@ import {
   KNOWN_CONDUIT_KEYS_TO_CONDUIT,
   MAX_INT,
   NO_CONDUIT,
+  OPENSEA_CONDUIT_KEY,
   OrderType,
   CROSS_CHAIN_SEAPORT_ADDRESS,
 } from "./constants";
@@ -35,6 +36,7 @@ import type {
   ContractMethodReturnType,
   MatchOrdersFulfillment,
   SeaportContract,
+  Signer,
 } from "./types";
 import { getApprovalActions } from "./utils/approval";
 import {
@@ -55,6 +57,7 @@ import {
   deductFees,
   feeToConsiderationItem,
   generateRandomSalt,
+  generateRandomSaltWithDomain,
   mapInputItemToOfferItem,
   totalItemsAmount,
 } from "./utils/order";
@@ -64,7 +67,9 @@ export class Seaport {
   // Provides the raw interface to the contract for flexibility
   public contract: SeaportContract;
 
-  private provider: providers.JsonRpcProvider;
+  private provider: providers.Provider;
+
+  private signer?: Signer;
 
   // Use the multicall provider for reads for batching and performance optimisations
   // NOTE: Do NOT await between sequential requests if you're intending to batch
@@ -76,12 +81,14 @@ export class Seaport {
 
   private defaultConduitKey: string;
 
+  readonly OPENSEA_CONDUIT_KEY: string = OPENSEA_CONDUIT_KEY;
+
   /**
-   * @param provider - The provider to use for web3-related calls
+   * @param providerOrSigner - The provider or signer to use for web3-related calls
    * @param considerationConfig - A config to provide flexibility in the usage of Seaport
    */
   public constructor(
-    provider: providers.JsonRpcProvider,
+    providerOrSigner: providers.JsonRpcProvider | Signer,
     {
       overrides,
       // Five minute buffer
@@ -90,8 +97,25 @@ export class Seaport {
       conduitKeyToConduit,
     }: SeaportConfig = {}
   ) {
+    const provider =
+      providerOrSigner instanceof providers.Provider
+        ? providerOrSigner
+        : providerOrSigner.provider;
+    this.signer = (providerOrSigner as Signer)._isSigner
+      ? (providerOrSigner as Signer)
+      : undefined;
+
+    if (!provider) {
+      throw new Error(
+        "Either a provider or custom signer with provider must be provided"
+      );
+    }
+
     this.provider = provider;
-    this.multicallProvider = new multicallProviders.MulticallProvider(provider);
+
+    this.multicallProvider = new multicallProviders.MulticallProvider(
+      this.provider
+    );
 
     this.contract = new Contract(
       overrides?.contractAddress ?? CROSS_CHAIN_SEAPORT_ADDRESS,
@@ -110,6 +134,18 @@ export class Seaport {
     };
 
     this.defaultConduitKey = overrides?.defaultConduitKey ?? NO_CONDUIT;
+  }
+
+  private _getSigner(accountAddress?: string): Signer {
+    if (this.signer) {
+      return this.signer;
+    }
+
+    if (!(this.provider instanceof providers.JsonRpcProvider)) {
+      throw new Error("Either signer or a JsonRpcProvider must be provided");
+    }
+
+    return this.provider.getSigner(accountAddress);
   }
 
   /**
@@ -153,7 +189,8 @@ export class Seaport {
    * @param input.restrictedByZone Whether the order should be restricted by zone
    * @param input.fees Convenience array to apply fees onto the order. The fees will be deducted from the
    *                   existing consideration items and then tacked on as new consideration items
-   * @param input.salt Random salt
+   * @param input.domain An optional domain to be hashed and included in the first four bytes of the random salt.
+   * @param input.salt Arbitrary salt. If not passed in, a random salt will be generated with the first four bytes being the domain hash or empty.
    * @param input.offerer The order's creator address. Defaults to the first address on the provider.
    * @param accountAddress Optional address for which to create the order with
    * @returns a use case containing the list of actions needed to be performed in order to create the order
@@ -170,11 +207,12 @@ export class Seaport {
       allowPartialFills,
       restrictedByZone,
       fees,
-      salt = generateRandomSalt(),
+      domain,
+      salt,
     }: CreateOrderInput,
     accountAddress?: string
   ): Promise<OrderUseCase<CreateOrderAction>> {
-    const signer = await this.provider.getSigner(accountAddress);
+    const signer = this._getSigner(accountAddress);
     const offerer = await signer.getAddress();
     const offerItems = offer.map(mapInputItemToOfferItem);
     const considerationItems = [
@@ -233,6 +271,10 @@ export class Seaport {
         : []),
     ];
 
+    const saltFollowingConditional =
+      salt ||
+      (domain ? generateRandomSaltWithDomain(domain) : generateRandomSalt());
+
     const orderParameters: OrderParameters = {
       offerer,
       zone,
@@ -244,7 +286,7 @@ export class Seaport {
       offer: offerItems,
       consideration: considerationItemsWithFees,
       totalOriginalConsiderationItems: considerationItemsWithFees.length,
-      salt,
+      salt: saltFollowingConditional,
       conduitKey,
     };
 
@@ -351,7 +393,7 @@ export class Seaport {
     counter: number,
     accountAddress?: string
   ): Promise<string> {
-    const signer = this.provider.getSigner(accountAddress);
+    const signer = this._getSigner(accountAddress);
 
     const domainData = await this._getDomainData();
 
@@ -381,7 +423,7 @@ export class Seaport {
     orders: OrderComponents[],
     accountAddress?: string
   ): TransactionMethods<ContractMethodReturnType<SeaportContract, "cancel">> {
-    const signer = this.provider.getSigner(accountAddress);
+    const signer = this._getSigner(accountAddress);
 
     return getTransactionMethods(this.contract.connect(signer), "cancel", [
       orders,
@@ -398,7 +440,7 @@ export class Seaport {
   ): TransactionMethods<
     ContractMethodReturnType<SeaportContract, "incrementCounter">
   > {
-    const signer = this.provider.getSigner(offerer);
+    const signer = this._getSigner(offerer);
 
     return getTransactionMethods(
       this.contract.connect(signer),
@@ -418,7 +460,7 @@ export class Seaport {
     orders: Order[],
     accountAddress?: string
   ): TransactionMethods<ContractMethodReturnType<SeaportContract, "validate">> {
-    const signer = this.provider.getSigner(accountAddress);
+    const signer = this._getSigner(accountAddress);
 
     return getTransactionMethods(this.contract.connect(signer), "validate", [
       orders,
@@ -612,7 +654,7 @@ export class Seaport {
     const { parameters: orderParameters } = order;
     const { offerer, offer, consideration } = orderParameters;
 
-    const fulfiller = await this.provider.getSigner(accountAddress);
+    const fulfiller = this._getSigner(accountAddress);
 
     const fulfillerAddress = await fulfiller.getAddress();
 
@@ -746,7 +788,7 @@ export class Seaport {
     conduitKey?: string;
     recipientAddress?: string;
   }) {
-    const fulfiller = await this.provider.getSigner(accountAddress);
+    const fulfiller = this._getSigner(accountAddress);
 
     const fulfillerAddress = await fulfiller.getAddress();
 
@@ -861,7 +903,7 @@ export class Seaport {
   }): TransactionMethods<
     ContractMethodReturnType<SeaportContract, "matchOrders">
   > {
-    const signer = this.provider.getSigner(accountAddress);
+    const signer = this._getSigner(accountAddress);
 
     return getTransactionMethods(this.contract.connect(signer), "matchOrders", [
       orders,
