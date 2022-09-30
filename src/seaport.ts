@@ -141,11 +141,11 @@ export class Seaport {
       return this.signer;
     }
 
-    if (!(this.provider instanceof providers.JsonRpcProvider)) {
-      throw new Error("Either signer or a JsonRpcProvider must be provided");
-    }
+    // if (!(this.provider instanceof providers.JsonRpcProvider)) {
+    //   throw new Error("Either signer or a JsonRpcProvider must be provided");
+    // }
 
-    return this.provider.getSigner(accountAddress);
+    return (this.provider as any).getSigner(accountAddress);
   }
 
   /**
